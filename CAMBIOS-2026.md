@@ -10,6 +10,8 @@
 > de su respuesta con precios inventados. **Tus números saldrán distintos** a los del vídeo, porque los
 > precios reales han seguido moviéndose.
 > Sin ejecutar: `Capitulo_09_MT5`, `ES_TA_Capítulo_09_MT5_Trading_en_Vivo_Random`, `ES_TA_Capítulo_09_MT5_Trading_en_Vivo_RSI` (MetaTrader 5 solo funciona en Windows, con el terminal y una cuenta).
+> En noviembre de 2026 se corrigieron además errores del propio código del curso, que dan resultados
+> distintos a los del vídeo: ver [Correcciones de errores del curso](#correcciones-de-errores-del-curso-noviembre-de-2026).
 
 ## Cómo usarla
 
@@ -85,3 +87,71 @@ Algunas celdas dan un error a propósito para explicar algo (por ejemplo, qué e
 - **`EURUSD_D1.csv` incluido en el repositorio.** El capítulo 3 lo lee pero no estaba en el repo; es el
   mismo fichero que el del curso *Trading Algorítmico de la A a la Z*.
 - **`requierements.txt` (con la errata) sustituido por `requirements.txt`**, con las versiones fijadas.
+
+## Correcciones de errores del curso (noviembre de 2026)
+
+Aquí no ha cambiado ninguna librería: son fallos del código del curso que enseñaban algo mal. **Lo que
+verás en pantalla será distinto del vídeo**, y está explicado en cada punto. Comprobado: los capítulos 5 a 8 se han
+vuelto a ejecutar enteros con `requirements.txt` y la réplica de Yahoo de arriba (todos sin error). Las
+cifras de antes y después salen de Yahoo Finance real, descargado el 19 de noviembre de 2026. El capítulo 8 descarga unos 150 activos de Yahoo uno a uno: sus cifras salen de la réplica de Yahoo, con precios inventados. Los notebooks de MetaTrader 5 **no se han ejecutado** (solo Windows).
+Los notebooks conservan la salida guardada del vídeo: en las celdas de estos puntos, lo guardado es el
+resultado antiguo (por ejemplo, `Alpha: 0.9 %`); al ejecutarlas, sale el nuevo.
+
+### 1. Alfa (capítulos 5 a 8)
+
+**En el vídeo:** alfa se calcula como `252 * mean * (1-beta)` (celda 15) y, dentro de `BackTest`, como
+`serie.mean() - beta*serie.mean()`. En los `BackTest` de los capítulos 6, 7 y 8 está escrito como
+`252*serie.mean() - 252*beta*serie.mean()`, que es lo mismo.
+
+**Qué estaba mal:** las dos expresiones son el retorno medio de la cartera multiplicado por (1 − beta).
+Ahí no aparece el mercado, así que no dicen si la cartera lo ha hecho mejor que él, y el signo puede salir
+al revés que el real. La fórmula escrita en la celda 14 tenía el mismo fallo.
+
+**Ahora:** es el alfa de Jensen, con tipo libre de riesgo cero: el retorno medio de la cartera menos beta
+por el retorno medio del SP500, anualizado igual que antes.
+
+```python
+alpha = (252 * (mean - beta*val["SP500"].mean()))*100                        # celda 15
+alpha = annualiazed_scalar * (serie.mean() - beta*val["SP500"].mean())       # BackTest
+```
+
+La fórmula de la celda 14 pasa a ser $r_{PF} - r_f - \beta (r_M - r_f)$. `BackTest` se llama igual y
+recibe lo mismo.
+
+En los capítulos 6 a 8 se usa la misma serie de mercado con la que ya se calcula la beta: `val["SP500"]` en
+el capítulo 6 y `val["Adj Close"]` (el SP500 sin renombrar) en los capítulos 7 y 8:
+
+```python
+alpha = 252*serie.mean() - 252*beta*val["SP500"].mean()       # capítulo 6
+alpha = 252*serie.mean() - 252*beta*val["Adj Close"].mean()   # capítulos 7 y 8
+```
+
+**Qué cambia en los números** (alfa anual; en los capítulos 7 y 8 se imprime sin multiplicar por 100):
+
+| | Antes | Ahora |
+|---|---|---|
+| RSI sobre Google 2004–2020 (beta −0,15), cap. 5, celda 15 | 7,9 % | 8,3 % |
+| `BackTest(return_serie)`, cap. 5, celda 23 | 7,907 % | 8,276 % |
+| Cap. 7, celdas 14 / 20 / 24 | −0,145 / 0,163 / 0,329 | −0,133 / 0,163 / 0,328 |
+| Cap. 8, celdas 20 / 24 / 28 (Yahoo simulado) | 0,043 / 0,038 / 0,048 | 0,043 / 0,038 / 0,049 |
+
+El `BackTest` del capítulo 6 no se llama en el notebook. Estas estrategias tienen beta cercana a 0, por eso
+cambian poco.
+
+Alfa no mide seguridad: es la rentabilidad que se obtiene por encima de la que tocaría por el riesgo de
+mercado asumido (beta). Con beta cercana a 0 apenas cambia; con beta cercana a 1, el cálculo antiguo daba
+casi 0 fuera cual fuera el alfa real.
+
+### 2. Capítulo 9 (MetaTrader 5): instalación y avisos (sin ejecutar)
+
+- **Celda 0 de los dos notebooks (RSI y Random):** se han comentado `numpy==1.19.2` y `scipy==1.6.2`, que no se
+  instalan en un Python actual: numpy 1.19.2 solo trae instaladores hasta Python 3.8, y scipy 1.6.2 no
+  admite Python 3.10 o posterior (en 3.12, pip intenta compilar numpy y falla). También se ha comentado
+  `pip install datetime`: `datetime` viene con Python, y en PyPI ese nombre es otro paquete. `numpy` se
+  sigue instalando, porque la piden `ta` y `MetaTrader5`. Si instalas en un entorno virtual, quita también
+  `--user`, que ahí da error.
+- **Avisos, sin cambiar el código:** hay un comentario en `filling_mode - 1` (en `Capitulo_09_MT5.py`) y otro en
+  los `while True` de los dos notebooks. `filling_mode` es una máscara de bits del broker: restarle 1 solo acierta si el
+  símbolo admite un único modo de ejecución, y si no, la orden puede rechazarse. El bucle no tiene ninguna
+  pausa: repite la ronda durante todo el segundo de arranque y luego da vueltas sin parar. Opera
+  siempre en una **cuenta demo**, y empieza con `live = False`.
