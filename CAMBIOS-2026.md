@@ -91,7 +91,7 @@ Algunas celdas dan un error a propósito para explicar algo (por ejemplo, qué e
 ## Correcciones de errores del curso (noviembre de 2026)
 
 Aquí no ha cambiado ninguna librería: son fallos del código del curso que enseñaban algo mal. **Lo que
-verás en pantalla será distinto del vídeo**, y está explicado en cada punto. Comprobado: los capítulos 5 a 8 se han
+verás en pantalla será distinto del vídeo**, y está explicado en cada punto. Comprobado: los capítulos 4 a 8 se han
 vuelto a ejecutar enteros con `requirements.txt` y la réplica de Yahoo de arriba (todos sin error). Las
 cifras de antes y después salen de Yahoo Finance real, descargado el 19 de noviembre de 2026. El capítulo 8 descarga unos 150 activos de Yahoo uno a uno: sus cifras salen de la réplica de Yahoo, con precios inventados. Los notebooks de MetaTrader 5 **no se han ejecutado** (solo Windows).
 Los notebooks conservan la salida guardada del vídeo: en las celdas de estos puntos, lo guardado es el
@@ -154,4 +154,64 @@ casi 0 fuera cual fuera el alfa real.
   los `while True` de los dos notebooks. `filling_mode` es una máscara de bits del broker: restarle 1 solo acierta si el
   símbolo admite un único modo de ejecución, y si no, la orden puede rechazarse. El bucle no tiene ninguna
   pausa: repite la ronda durante todo el segundo de arranque y luego da vueltas sin parar. Opera
-  siempre en una **cuenta demo**, y empieza con `live = False`.
+  siempre en una **cuenta demo**, y empieza con `live = False` (ver el punto 6: hasta noviembre, `False` también
+  operaba).
+
+### 3. El mapa de calor del capítulo 7 tenía los ejes cambiados
+
+**En el vídeo:** se calcula el Sortino de la estrategia RSI para cada combinación de valor neutral y tamaño
+de ventana, y se lee en un mapa de calor cuál es la mejor (celdas 11 y 13). La matriz se monta «en las
+filas, los valores de neutral, y en las columnas, los de window».
+
+**Qué estaba mal:** `sns.heatmap` dibuja las filas en el eje vertical, pero el eje vertical se rotulaba como
+ventana y el horizontal como neutral. Todo el mapa estaba traspuesto: la casilla rotulada «neutral 10,
+ventana 2» era en realidad neutral 0, ventana 12.
+
+**Ahora:** se dibuja `grid.T` (y `grid_train.T`, `grid_test.T`). Los ejes y sus rótulos son los mismos que en
+el vídeo; lo que cambia es qué valor cae en cada casilla.
+
+**Qué cambia en los números** (celda 11, GOOG hasta el 19-11-2026): la casilla «neutral 10, ventana 2» pasa
+de 0,47 a 0,0057. El 0,47 es el Sortino de neutral 0, ventana 12 (calculado aparte con la misma función), y
+ahí es donde aparece ahora el máximo. Las combinaciones que el vídeo elige mirando el mapa están leídas del
+revés.
+
+### 4. La tabla de pesos del capítulo 8 tenía las filas mal rotuladas
+
+**Qué estaba mal:** la celda 27 apila los pesos como `[res_SR.x, res_MV.x, res_SK.x]` y los rotulaba
+`index = ["SK", "SR", "MV"]`: cada fila llevaba el nombre de otro criterio. Se ve en la propia salida
+guardada: la fila «SK» es la que imprime la celda 23 para `res_SR`.
+
+**Ahora:** `index = ["SR", "MV", "SK"]`. Los números son los mismos; cambia el nombre de cada fila.
+
+### 5. La función `RSI` (capítulos 4 a 8)
+
+- **El aviso no avisaba.** `ValueError("Necesitamos tener… Adj Close")` creaba el error sin lanzarlo, así que
+  con un DataFrame sin esa columna la función seguía y fallaba una línea después con un `KeyError: 'Adj
+  Close'` sin explicación. Ahora es `raise ValueError(...)`, que es lo que el vídeo dice que hace.
+- **Capítulo 6:** dentro de la función se mezclaban `val` (el argumento) y `f` (una variable de fuera). Es el
+  fallo que el vídeo reconoce y corrige en el capítulo 7; aquí seguía. Funcionaba solo porque el notebook
+  siempre la llama con `f`. Ahora usa `val` en todas partes. **Los resultados no cambian** (comprobado: el
+  capítulo 6 da la misma salida, línea a línea, antes y después).
+
+### 6. `live = False` no paraba el robot (capítulo 9, RSI; sin ejecutar)
+
+**En el notebook:** `# True = Live Trading and False = Screener`.
+
+**Qué estaba mal:** `live` solo decidía si se imprimía el saldo de la cuenta. `MT5.run(...)` se llamaba
+siempre, así que con `live = False` el robot abría órdenes igual.
+
+**Ahora:** como en el notebook del curso de *Trading Algorítmico de la A a la Z*: con `live = True` se opera;
+con `live = False` solo se imprimen el símbolo y las señales de compra y venta.
+
+**Sigue igual, y conviene saberlo:** al llegar la hora de `start`, el robot cierra **todas** las posiciones
+abiertas de la cuenta (también con `live = False`, y también las que no haya abierto él) y vuelve a abrir
+las que tocan. Si la señal es la misma que ayer, cierra y reabre la misma posición, y paga el spread cada día.
+
+## Erratas del vídeo (el código no cambia)
+
+- **Mapa de calor (capítulo 7).** Las lecturas del mapa (el 0,52 de «neutral 10, ventana 2» como óptimo, y
+  las combinaciones que se prueban después en validación) están hechas sobre el mapa traspuesto del punto 3.
+  Las celdas 16 y 22, que eligen la combinación con una tabla y no con el mapa, sí estaban bien.
+- **Tabla de pesos (capítulo 8).** Lo que se dice de cada criterio al leer la tabla corresponde a otra fila
+  (punto 4): la fila rotulada «SK» era Sortino, la «SR» era mínima varianza y la «MV» era el criterio de
+  media, varianza, sesgo y curtosis.
